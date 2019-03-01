@@ -1,0 +1,75 @@
+<configuration>
+    <!--for color detect (HSV)-->
+    <hsv_filtering>
+        <red>
+            <!--0…179 (Hue)-->
+            <low_h>0</low_h>
+            <high_h>40</high_h>
+            <!--0…255 (Saturation)-->
+            <low_s>127</low_s>
+            <high_s>255</high_s>
+            <!--0…255 (Value)-->
+            <low_v>127</low_v>
+            <high_v>255</high_v>
+            <!--for blue road signs-->
+        </red>
+        <blue>
+            <!--0…179 (Hue)-->
+            <low_h>85</low_h>
+            <high_h>179</high_h>
+            <!--0…255 (Saturation)-->
+            <low_s>127</low_s>
+            <high_s>255</high_s>
+            <!--0…255 (Value)-->
+            <low_v>127</low_v>
+            <high_v>255</high_v>
+            <!--for blue road signs-->
+        </blue>
+    </hsv_filtering>
+    <gui>
+        <show_windows>true</show_windows>
+    </gui>
+    <video>
+        <video_input_source_number>0</video_input_source_number>
+    </video>
+    <hough_circle_transform_parametrs>
+        <dp>1.5</dp>
+        <min_dist>25</min_dist>
+        <p1>200</p1>
+        <p2>100</p2>
+        <!--Caution! Min radius in not smaller then 15 -->
+        <min_radius>15</min_radius>
+        <max_radius>160</max_radius>
+    </hough_circle_transform_parametrs>
+    <detection>
+        <threshold>200</threshold>
+        <!--the ratio of non zero pixels to zero pixels from monochrome image.
+        if it higher then this value then image will go on to detection -->
+        <ratio_nonzeros_to_zeros>2</ratio_nonzeros_to_zeros>
+    </detection>
+    <files>
+        <road_sign_samples_directory>../samples/</road_sign_samples_directory>
+        <road_sign_samples>
+            <forward_only>forward_only_0.png;forward_only_1.png;forward_only_2.png</forward_only>
+            <right_turn_only>right_only_0.png;right_only_1.png;right_only_2.png</right_turn_only>
+            <left_turn_only>left_only_0.png;left_only_1.png;left_only_2.png;left_only_3.png</left_turn_only>
+            <right_turn_or_forward_only>
+                right_or_forward_only_0.png;right_or_forward_only_1.png;right_or_forward_only_2.png;right_or_forward_only_3.png;right_or_forward_only_4.png
+            </right_turn_or_forward_only>
+            <stop>STOP.jpg</stop>
+            <do_not_enter>do_not_enter_0.png;do_not_enter_1.png;do_not_enter_2.png;do_not_enter_3.png</do_not_enter>
+        </road_sign_samples>
+        <logfile>/dev/stdout</logfile>
+        <test_output_directory>../output/</test_output_directory>
+        <save_test_images>false</save_test_images>
+        <!--duplicated-->
+        <FOLDER_FOR_TEST_IMAGES_OUTPUT>"../test_images_output"</FOLDER_FOR_TEST_IMAGES_OUTPUT>
+    </files>
+    <serial_connection>
+        <port>"/dev/ttyACM0"</port>
+        <fake>true</fake>
+    </serial_connection>
+</configuration>
+
+        <!--BLUR_K_SIZE = 5-->
+        <!--EDGE_THRESHOLD = 16-->
