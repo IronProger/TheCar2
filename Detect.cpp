@@ -44,7 +44,7 @@ void Detect::init ()
 }
 
 // return a number of road sign (enum of struct RoadSign)
-int Detect::detect (cv::Mat mat)
+int Detect::detect (cv::Mat mat, RoadSign::Color color)
 {
     assert(mat.channels() == 1);
     Mat1d image;
@@ -78,10 +78,13 @@ int Detect::detect (cv::Mat mat)
     }
 
     // detect
-    double maximum;
-    int sign;
+    double maximum = 0;
+    int sign = 0;
     for (const pair<int, Mat1d> & p : samples)
     {
+        // color filter (It improve detection quality separating red from blue)
+        if (RoadSign::whatIsColor(p.first) != color) continue;
+
         assert(p.second.type() == masked.type());
         assert(p.second.rows == masked.rows && p.second.cols == masked.cols);
         Mat1d result = p.second.mul(masked);

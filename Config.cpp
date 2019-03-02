@@ -36,24 +36,29 @@ void Config::init (const char * pathToConfig)
 }
 
 
-vector<string> splitString (string s, const char separator)
+vector<string> splitString (string s, const vector<char> & separators)
 {
     vector<string> v;
 
     string temperate;
+
     for (char c : s)
     {
-        if (c != separator)
+        for (const char sep : separators)
         {
-            temperate += c;
-        } else
-        {
-            if (!temperate.empty())
+            if (c == sep)
             {
-                v.emplace_back(string(temperate));
-                temperate.clear();
+                if (!temperate.empty())
+                {
+                    v.emplace_back(string(temperate));
+                    temperate.clear();
+                }
+                goto EXTRA_CONTINUE;
             }
         }
+        temperate += c;
+        EXTRA_CONTINUE:
+        continue;
     }
     if (!temperate.empty())
         v.emplace_back(temperate);
@@ -66,7 +71,7 @@ xml_text getXmlText (std::string path)
     assert(!path.empty());
     path = "configuration/" + path;
     xml_node targetNode;
-    for (string & s : splitString(path, '/'))
+    for (string & s : splitString(path, vector<char>{'/'}))
     {
         if (targetNode.empty()) targetNode = config.child(s.c_str());
         else targetNode = targetNode.child(s.c_str());
@@ -127,5 +132,5 @@ bool Config::getBool (std::string path)
 
 vector<string> Config::getStringVector (std::string path)
 {
-    return splitString(getXmlText(path).as_string(), ';');
+    return splitString(getXmlText(path).as_string(), vector<char>{' ', '\n', '\t'});
 }

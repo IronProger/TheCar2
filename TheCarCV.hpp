@@ -43,9 +43,11 @@ private:
 
     TheCarCV ();
 
-    TheCarCV (const TheCarCV &);
+    TheCarCV (const TheCarCV &)
+    { assert(false); }
 
-    TheCarCV & operator= (TheCarCV &);
+    TheCarCV & operator= (TheCarCV &)
+    { assert(false); }
 
     void init ();
 
@@ -60,11 +62,11 @@ private:
 
     bool cutSquareRegionByCircle (cv::Mat & src, cv::Mat & dsc, int x, int y, int radius);
 
-    inline bool cutSquareRegionByCircle (cv::Mat & src, cv::Mat & dsc, cv::Vec3f circle);
-
     void openCVHughCircleTransform (cv::Mat & src, vector<cv::Vec3f> & circles);
 
     void processFrame (cv::Mat frame);
+
+    double getNonzerosToZerosRatio (const cv::Mat & monochromeImg);
 
 public:
 

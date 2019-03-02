@@ -90,7 +90,7 @@ void TheCarCV::init ()
 
     /// video input init
 
-    LOGD << "trying to set a webcam";
+    LOGD << "try to open a webcam";
     int videoInputSourceNumber = getInt("video/video_input_source_number");
     try
     {
@@ -190,49 +190,35 @@ void TheCarCV::edgeDetect (Mat & src, Mat & dsc)
     dsc = edges;
 }
 
-// if success then return true else return false
-// also return false if src is not a trust image for detection (smaller than 2/3 of square if white)
-// do not resize a result image — it's already resized to RESOLUTION_OF_IMAGE_FOR_DETECTION
+// if success then returns true else returns false
 bool TheCarCV::cutSquareRegionByCircle (Mat & src, Mat & dsc, int x, int y, int radius)
 {
-    // first math rect x and y, height and width
-    int rectX, rectY, rectHeight, rectWidth;
-    rectX = x - radius;
-    rectY = y - radius;
-    rectHeight = radius * 2;
-    rectWidth = radius * 2;
+    assert(radius > 0);
+    int x0 = x - radius;
+    int y0 = y - radius;
 
-    // then cat an square
-    Rect rect(rectX, rectY, rectWidth, rectHeight);
-
-    Mat cutRect;
-    if (0 <= rectX && 0 <= rectWidth && rectX + rectWidth <= src.cols
-        && 0 <= rectY && 0 <= rectHeight && rectY + rectHeight <= src.rows)
-    {
-        src(rect).copyTo(cutRect);
-    } else
-    {
-        //LOGW << "expression (0 <= rectX && 0 <= rectWidth && rectX + rectWidth <= src.cols && 0 <= rectY && 0 <= rectHeight && rectY + rectHeight <= src.rows) returned false";
+    // doesn't circle go out of image
+    if (x0 < 0 || y0 < 0)
         return false;
-    }
-
-    Mat resultThresholded;
-    threshold(cutRect, resultThresholded, 170, 255, CV_THRESH_BINARY);
-    if (countNonZero(resultThresholded) <
-        (RESOLUTION_OF_IMAGE_FOR_DETECTION * RESOLUTION_OF_IMAGE_FOR_DETECTION * 0.7))
-    {
+    if (x + radius > src.cols || y + radius > src.rows)
         return false;
-    }
 
-    dsc = cutRect;
+    dsc = Mat(src, Rect_<int>(x0, y0, 2 * radius, 2 * radius));
     return true;
 }
 
-inline bool TheCarCV::cutSquareRegionByCircle (Mat & src, Mat & dsc, Vec3f circle)
-{
-    return cutSquareRegionByCircle(src, dsc, circle[0], circle[1], circle[2]);
-}
 
+double TheCarCV::getNonzerosToZerosRatio (const cv::Mat & monochromeImg)
+{
+    assert(monochromeImg.type() == CV_8UC1);
+    int countOfZero = 0, countOfNonZero = 0;
+    for (uint8_t pixel : Mat_<uint8_t>(monochromeImg))
+    {
+        if (pixel) countOfNonZero++;
+        else countOfZero++;
+    }
+    return (double) countOfNonZero / (double) countOfZero;
+}
 
 void TheCarCV::processFrame (Mat frame)
 {
@@ -250,39 +236,47 @@ void TheCarCV::processFrame (Mat frame)
     hsvFilter(imgHSV, red, redILowH, redIHighH, redILowS, redIHighS, redILowV, redIHighV);
     hsvFilter(imgHSV, blue, blueILowH, blueIHighH, blueILowS, blueIHighS, blueILowV, blueIHighV);
 
-    Mat redAndBlueOnly;
-    bitwise_or(red, blue, redAndBlueOnly);
+    {
+        Mat redAndBlueOnly(red.size(), CV_8UC3);
+        int red_from_to[] = {0, 2};
+        mixChannels(red, redAndBlueOnly, red_from_to, 1);
+        int blue_from_to[] = {0, 0, -1, 1};
+        mixChannels(blue, redAndBlueOnly, blue_from_to, 2);
 
-    imshow("red and blue only", redAndBlueOnly);
+        imshow("red and blue only", redAndBlueOnly);
+    }
 
     vector<Vec3f> circles;
     openCVHughCircleTransform(gray, circles);
 
-    for (Vec3f & c : circles)
+    for (const Vec3f & c : circles)
     {
-        Mat result;
+        const int minRadius = getInt("hough_circle_transform_parametrs/min_radius");
+        if (c[2] < minRadius) continue; // it's double verify for minRadius limit
 
-        if (cutSquareRegionByCircle(redAndBlueOnly, result, (const Vec3f) c))
+        Mat redResult, blueResult;
+
+        if (!cutSquareRegionByCircle(red, redResult, c[0], c[1], c[2])) continue;
+        if (!cutSquareRegionByCircle(blue, blueResult, c[0], c[1], c[2])) continue;
+
+        double nonzerosToZerosRatioOfRed = getNonzerosToZerosRatio(redResult);
+        double nonzerosToZerosRatioOfBlue = getNonzerosToZerosRatio(blueResult);
+
+        static double minRatio = getDouble("detection/ratio_nonzeros_to_zeros");
+        // if in both images too small non zero pixels then there is no good shot, is isn't red or blue sign
+        if (max(nonzerosToZerosRatioOfRed, nonzerosToZerosRatioOfBlue) < minRatio) continue;
+
+        if (nonzerosToZerosRatioOfBlue > nonzerosToZerosRatioOfRed) // then it's blue sign
         {
-            circle(frame, Point(cvRound(c[0]), cvRound(c[1])), cvRound(c[2]), Scalar(50, 150, 0), 3); // ~green color
-
-            int countOfZero = 0, countOfNonZero = 0;
-            for (uint8_t pixel : Mat_<uint8_t>(result))
-            {
-                if (pixel) countOfNonZero++;
-                else countOfZero++;
-            }
-            double currentRatio = (double) countOfNonZero / (double) countOfZero;
-            double minRatio = getDouble("detection/ratio_nonzeros_to_zeros");
-            //LOGI << "countOfNonZero/countOfZero="+to_string((double) countOfNonZero/ (double) countOfZero);
-
-            // if in image too small non zero pixels then it isn't correct shot, is isn't red or blue sign
-            if (currentRatio > minRatio)
-            {
-                Detect::getInstance().detect(result);
-            }
+            Detect::getInstance().detect(blueResult, RoadSign::Color::BLUE);
+            // then draw to main window what we found
+            circle(frame, Point(cvRound(c[0]), cvRound(c[1])), cvRound(c[2]), Scalar(200, 50, 30), 3); // ~blue color
+        } else
+        { // red
+            Detect::getInstance().detect(redResult, RoadSign::Color::RED);
+            // then draw to main window what we found
+            circle(frame, Point(cvRound(c[0]), cvRound(c[1])), cvRound(c[2]), Scalar(60, 20, 230), 3); // ~red color
         }
-
     }
 
     IFWIN imshow("original", frame);

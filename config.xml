@@ -42,7 +42,7 @@
         <max_radius>160</max_radius>
     </hough_circle_transform_parametrs>
     <detection>
-        <threshold>200</threshold>
+        <threshold>220</threshold>
         <!--the ratio of non zero pixels to zero pixels from monochrome image.
         if it higher then this value then image will go on to detection -->
         <ratio_nonzeros_to_zeros>2</ratio_nonzeros_to_zeros>
@@ -50,14 +50,38 @@
     <files>
         <road_sign_samples_directory>../samples/</road_sign_samples_directory>
         <road_sign_samples>
-            <forward_only>forward_only_0.png;forward_only_1.png;forward_only_2.png</forward_only>
-            <right_turn_only>right_only_0.png;right_only_1.png;right_only_2.png</right_turn_only>
-            <left_turn_only>left_only_0.png;left_only_1.png;left_only_2.png;left_only_3.png</left_turn_only>
+            <forward_only>
+                forward_only_0.png
+                forward_only_1.png
+                forward_only_2.png
+            </forward_only>
+            <right_turn_only>
+                right_only_0.png
+                right_only_1.png
+                right_only_2.png
+            </right_turn_only>
+            <left_turn_only>
+                left_only_0.png
+                left_only_1.png
+                left_only_2.png
+                left_only_3.png
+            </left_turn_only>
             <right_turn_or_forward_only>
-                right_or_forward_only_0.png;right_or_forward_only_1.png;right_or_forward_only_2.png;right_or_forward_only_3.png;right_or_forward_only_4.png
+                right_or_forward_only_0.png
+                right_or_forward_only_1.png
+                right_or_forward_only_2.png
+                right_or_forward_only_3.png
+                right_or_forward_only_4.png
             </right_turn_or_forward_only>
-            <stop>STOP.jpg</stop>
-            <do_not_enter>do_not_enter_0.png;do_not_enter_1.png;do_not_enter_2.png;do_not_enter_3.png</do_not_enter>
+            <stop>
+                STOP.jpg
+            </stop>
+            <do_not_enter>
+                do_not_enter_0.png
+                do_not_enter_1.png
+                do_not_enter_2.png
+                do_not_enter_3.png
+            </do_not_enter>
         </road_sign_samples>
         <logfile>/dev/stdout</logfile>
         <test_output_directory>../output/</test_output_directory>
@@ -70,6 +94,3 @@
         <fake>true</fake>
     </serial_connection>
 </configuration>
-
-        <!--BLUR_K_SIZE = 5-->
-        <!--EDGE_THRESHOLD = 16-->

@@ -9,16 +9,39 @@
 #include <map>
 #include <opencv2/core/mat.hpp>
 
+// static only
 struct RoadSign
 {
+    enum Color
+    {
+        RED, BLUE, UNKNOWN
+    };
+
     enum
     {
         FORWARD_ONLY, RIGHT_TURN_ONLY, LEFT_TURN_ONLY, RIGHT_TURN_OR_FORWARD_ONLY, STOP, DO_NOT_ENTER, NONE
     };
 
-    static std::string getName (int n)
+    static Color whatIsColor (int roadSign)
     {
-        switch (n)
+        switch (roadSign)
+        {
+            case FORWARD_ONLY:
+            case RIGHT_TURN_ONLY:
+            case LEFT_TURN_ONLY:
+            case RIGHT_TURN_OR_FORWARD_ONLY:
+                return BLUE;
+            case STOP:
+            case DO_NOT_ENTER:
+                return RED;
+            default:
+                return UNKNOWN;
+        }
+    }
+
+    static std::string getName (int roadSign)
+    {
+        switch (roadSign)
         {
             case FORWARD_ONLY:
                 return "forward_only";
@@ -38,9 +61,11 @@ struct RoadSign
                 return "UNKNOWN";
         }
     }
+
+
 };
 
-// sigleton
+// singleton
 class Detect
 {
 private:
@@ -74,7 +99,7 @@ public:
 
     void init ();
 
-    int detect (cv::Mat monochromeImage);
+    int detect (cv::Mat monochromeImage, RoadSign::Color color);
 };
 
 
