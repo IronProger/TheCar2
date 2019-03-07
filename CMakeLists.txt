@@ -19,7 +19,6 @@ link_libraries(
         opencv_photo
         opencv_xphoto
         opencv_imgcodecs
-        lua
         stdc++fs
         pthread
         pugixml

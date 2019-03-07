@@ -6,17 +6,17 @@
             <low_h>0</low_h>
             <high_h>40</high_h>
             <!--0…255 (Saturation)-->
-            <low_s>127</low_s>
+            <low_s>70</low_s>
             <high_s>255</high_s>
             <!--0…255 (Value)-->
-            <low_v>127</low_v>
+            <low_v>70</low_v>
             <high_v>255</high_v>
             <!--for blue road signs-->
         </red>
         <blue>
             <!--0…179 (Hue)-->
             <low_h>85</low_h>
-            <high_h>179</high_h>
+            <high_h>160</high_h>
             <!--0…255 (Saturation)-->
             <low_s>127</low_s>
             <high_s>255</high_s>
@@ -33,7 +33,7 @@
         <video_input_source_number>0</video_input_source_number>
     </video>
     <hough_circle_transform_parametrs>
-        <dp>1.5</dp>
+        <dp>2.5</dp>
         <min_dist>25</min_dist>
         <p1>200</p1>
         <p2>100</p2>

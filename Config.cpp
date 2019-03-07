@@ -2,7 +2,6 @@
 // Created by rege on 09.03.17.
 //
 
-#include <kaguya.hpp>
 #include <pugixml.hpp>
 #include <plog/Log.h>
 
