@@ -8,151 +8,203 @@
 #include "TheCarCV.hpp"
 #include "Config.hpp"
 #include "Detect.hpp"
+#include "speedtest.h"
 
 
 using namespace std;
 using namespace experimental::filesystem;
 using namespace cv;
 
-/**
- * warning: before every line, which works with windows, macro “IFWIN” must be put
- * (this lines will be skipped when windows mode will be off)
- * */
-
 TheCarCV::TheCarCV ()
+{}
+
+void TheCarCV::setUpWindows ()
 {
-    init();
-}
-
-bool TheCarCV::isShowingWindows ()
-{
-    return this->createWindows;
-}
-
-void TheCarCV::turnOnWindows ()
-{
-    // (“IFWIN” macro doesn't need for this function) 
-
-    this->createWindows = true;
-
     /// creating windows
+    namedWindow("original", CV_WINDOW_AUTOSIZE);
 
-    for (string & winName : *windows)
+    if (showExtra)
     {
-        namedWindow(winName, CV_WINDOW_AUTOSIZE);
+        namedWindow("color filter", CV_WINDOW_AUTOSIZE);
+
+        /// set up "control" window
+        // blue
+        createTrackbar("blue LowH", "color filter", &blueILowH, 179); //Hue (0 - 179)
+        createTrackbar("blue HighH", "color filter", &blueIHighH, 179);
+
+        createTrackbar("blue LowS", "color filter", &blueILowS, 255); //Saturation (0 - 255)
+        createTrackbar("blue HighS", "color filter", &blueIHighS, 255);
+
+        createTrackbar("blue LowV", "color filter", &blueILowV, 255); //Value (0 - 255)
+        createTrackbar("blue HighV", "color filter", &blueIHighV, 255);
+
+        int __fakeDp;
+        createTrackbar("dp (x0.1)", "color filter", &__fakeDp, 50, [] (int n, void * data)
+        {
+            double * dp = (double *) data;
+            *dp = ((double) n) / 10;
+            if (*dp == 0) *dp = 0.1;
+        }, (void *) &hDp);
+
+        createTrackbar("minDist", "color filter", &hMinDist, 200);
+        createTrackbar("param1", "color filter", &hParam1, 1000);
+        createTrackbar("param2", "color filter", &hParam2, 1000);
+        createTrackbar("minRadius", "color filter", &hMinRadius, 200);
+        createTrackbar("maxRadius", "color filter", &hMaxRadius, 200);
+
+        createTrackbar("threshold", "edges", &edgeThreshold, 100);
     }
-
-    /// "control" window set
-    // red
-    createTrackbar("red LowH", "color filter", &redILowH, 179); //Hue (0 - 179)
-    createTrackbar("red HighH", "color filter", &redIHighH, 179);
-
-    createTrackbar("red LowS", "color filter", &redILowS, 255); //Saturation (0 - 255)
-    createTrackbar("red HighS", "color filter", &redIHighS, 255);
-
-    createTrackbar("red LowV", "color filter", &redILowV, 255); //Value (0 - 255)
-    createTrackbar("red HighV", "color filter", &redIHighV, 255);
-    // blue
-    createTrackbar("blue LowH", "color filter", &blueILowH, 179); //Hue (0 - 179)
-    createTrackbar("blue HighH", "color filter", &blueIHighH, 179);
-
-    createTrackbar("blue LowS", "color filter", &blueILowS, 255); //Saturation (0 - 255)
-    createTrackbar("blue HighS", "color filter", &blueIHighS, 255);
-
-    createTrackbar("blue LowV", "color filter", &blueILowV, 255); //Value (0 - 255)
-    createTrackbar("blue HighV", "color filter", &blueIHighV, 255);
-
-    int __fakeDp;
-    createTrackbar("dp (x0.1)", "color filter", &__fakeDp, 50, [] (int n, void * data)
-    {
-        double * dp = (double *) data;
-        *dp = ((double) n) / 10;
-        if (*dp == 0) *dp = 0.1;
-    }, (void *) &hDp);
-
-    createTrackbar("minDist", "color filter", &hMinDist, 200);
-    createTrackbar("param1", "color filter", &hParam1, 1000);
-    createTrackbar("param2", "color filter", &hParam2, 1000);
-    createTrackbar("minRadius", "color filter", &hMinRadius, 200);
-    createTrackbar("maxRadius", "color filter", &hMaxRadius, 200);
-
-    createTrackbar("threshold", "edges", &edgeThreshold, 100);
 }
 
 void TheCarCV::init ()
 {
     LOGD << "TheCarCV init…";
 
-    /// video output init
-
-    // names for windows, which will be created
-    windows = new vector<string>{"original", "color filter"};
-
-    /// video input init
-
-    LOGD << "try to open a webcam";
-    int videoInputSourceNumber = getInt("video/video_input_source_number");
-    try
+    string mode = getString("mode");
+    if (mode == "quiet_detection")
     {
-        cap = new VideoCapture(videoInputSourceNumber); //capture the video from web cam
+        this->mode = DETECTION;
+        this->show = false;
+    } else if (mode == "learning")
+    {
+        this->mode = LEARNING;
+        this->show = false;
+    } else if (mode == "detection")
+    {
+        this->mode = DETECTION;
+        this->show = true;
+    } else if (mode == "collect")
+    {
+        this->mode = COLLECT;
+        this->show = true;
+    } else if (mode == "quiet_collect")
+    {
+        this->mode = COLLECT;
+        this->show = false;
+    } else if (mode == "video")
+    {
+        this->mode = VIDEO;
+        this->show = true;
+    } else
+    {
+        LOGF << "You gave me mode \"" + mode + "\". Please check it in config.xml because\
+                    I don't know what this mode means me to do. I'll just terminate.";
+        exit(20);
     }
-    catch (exception e)
+    LOGI << "I'm working in mode \"" + mode + "\"";
+
+    showExtra = getBool("gui/show_extra_windows");
+
+    switch (this->mode)
     {
-        LOGF << "cannot open webcam " + to_string(videoInputSourceNumber);
-        throw (e);
+        case DETECTION:
+            Detect::getInstance().init();
+            Detect::getInstance().loadData();
+            break;
+        case COLLECT:
+            Detect::getInstance().init();
+            Detect::getInstance().createDirectories();
+            break;
+        case LEARNING:
+            Detect::getInstance().init();
+            break;
     }
-    LOGI << "video input source " + to_string(videoInputSourceNumber) + " has set";
 
-    if (!cap->isOpened())  // if not success, exit program with error
+    if (this->mode != LEARNING)
     {
-        LOGE << "Cannot open the web cam";
-        __throw_system_error(2);
-    } else LOGI << "video input source " + to_string(videoInputSourceNumber) + " has opened seccesfully";
+        // All this initialization doesn't need if the application starts for learning
 
-    /// configuration set
+        /// video input init
 
-    redILowH = getInt("hsv_filtering/red/low_h");
-    redIHighH = getInt("hsv_filtering/red/high_h");
-    redILowS = getInt("hsv_filtering/red/low_s");
-    redIHighS = getInt("hsv_filtering/red/high_s");
-    redILowV = getInt("hsv_filtering/red/low_v");
-    redIHighV = getInt("hsv_filtering/red/high_v");
+        LOGD << "try to open a webcam";
+        int videoInputSourceNumber = getInt("video/video_input_source_number");
+        try
+        {
+            cap = new VideoCapture(videoInputSourceNumber); //capture the video from web cam
+        }
+        catch (exception e)
+        {
+            LOGF << "cannot open webcam " + to_string(videoInputSourceNumber);
+            throw (e);
+        }
+        LOGI << "video input source " + to_string(videoInputSourceNumber) + " has set";
 
-    blueILowH = getInt("hsv_filtering/blue/low_h");
-    blueIHighH = getInt("hsv_filtering/blue/high_h");
-    blueILowS = getInt("hsv_filtering/blue/low_s");
-    blueIHighS = getInt("hsv_filtering/blue/high_s");
-    blueILowV = getInt("hsv_filtering/blue/low_v");
-    blueIHighV = getInt("hsv_filtering/blue/high_v");
+        if (!cap->isOpened())  // if not success, exit program with error
+        {
+            LOGE << "Cannot open the web cam";
+            __throw_system_error(2);
+        } else LOGI << "video input source " + to_string(videoInputSourceNumber) + " has opened seccesfully";
 
-    hDp = getDouble("hough_circle_transform_parametrs/dp");
-    hMinDist = getInt("hough_circle_transform_parametrs/min_dist");
-    hParam1 = getInt("hough_circle_transform_parametrs/p1");
-    hParam2 = getInt("hough_circle_transform_parametrs/p2");
-    hMinRadius = getInt("hough_circle_transform_parametrs/min_radius");
-    hMaxRadius = getInt("hough_circle_transform_parametrs/max_radius");
+        /// load some data from the config
+
+        blueILowH = getInt("hsv_filtering/blue/low_h");
+        blueIHighH = getInt("hsv_filtering/blue/high_h");
+        blueILowS = getInt("hsv_filtering/blue/low_s");
+        blueIHighS = getInt("hsv_filtering/blue/high_s");
+        blueILowV = getInt("hsv_filtering/blue/low_v");
+        blueIHighV = getInt("hsv_filtering/blue/high_v");
+
+        hDp = getDouble("hough_circle_transform_parametrs/dp");
+        hMinDist = getInt("hough_circle_transform_parametrs/min_dist");
+        hParam1 = getInt("hough_circle_transform_parametrs/p1");
+        hParam2 = getInt("hough_circle_transform_parametrs/p2");
+        hMinRadius = getInt("hough_circle_transform_parametrs/min_radius");
+        hMaxRadius = getInt("hough_circle_transform_parametrs/max_radius");
 
 
-    Detect::getInstance().init();
+        if (show) setUpWindows();
+    }
+}
+
+void reinforceBlueUsingRed (const Mat3b & src, Mat3b & dst)
+{
+    typedef Point3_<unsigned char> Pixel;
+    Mat3b result(src.rows, src.cols);
+    for (int y = 0; y < src.rows; y++)
+    {
+        for (int x = 0; x < src.cols; x++)
+        {
+            Pixel p = src.at<Pixel>(y, x);
+            p.x = max(p.x, p.z);
+            result.at<Pixel>(y, x) = p;
+        }
+    }
+    dst = result;
 }
 
 void TheCarCV::start ()
 {
-    vector<RoadSignData> roadSigns;
+    if (mode == LEARNING)
+    {
+        SPEEDTEST_("learning", Detect::getInstance().train());
+        LOGI << "Learning ends. I have to terminate the program.";
+        return;
+    }
 
     for (;;)
     {
         Mat frame;
+        static int cannotFetAFrame = 0;
         if (!cap->read(frame))
         {
-            //LOGE << "Cannot open the web cam";
-            __throw_system_error(2);
+            cannotFetAFrame++;
+            // if cannotGetAFrame is too big then it's a serious error, let big is 10
+            if (cannotFetAFrame == 10)
+            {
+                LOGF << "Cannot get a frame from the web cam";
+                __throw_system_error(2);
+            }
         }
+        cannotFetAFrame = 0;
+
         if (waitKey(10) == 27)
         {
             break;
         }
-        processFrame(frame);
+        if (processFrame(frame))
+        {
+            break;
+        }
     }
 
     LOGI << "TheCarCV terminated";
@@ -178,18 +230,6 @@ void TheCarCV::openCVHughCircleTransform (Mat & gray, vector<Vec3f> & circles)
                  hDp, hMinDist, hParam1, hParam2, hMinRadius, hMaxRadius);
 }
 
-// edges detection with controlable trashhold
-void TheCarCV::edgeDetect (Mat & src, Mat & dsc)
-{
-    Mat srcGray;
-    cvtColor(src, srcGray, CV_BGR2GRAY);
-    int ratio = 7;
-    int kernel_size = 3;
-    Mat edges;
-    Canny(srcGray, edges, edgeThreshold, edgeThreshold * ratio, kernel_size);
-    dsc = edges;
-}
-
 // if success then returns true else returns false
 bool TheCarCV::cutSquareRegionByCircle (Mat & src, Mat & dsc, int x, int y, int radius)
 {
@@ -207,7 +247,6 @@ bool TheCarCV::cutSquareRegionByCircle (Mat & src, Mat & dsc, int x, int y, int 
     return true;
 }
 
-
 double TheCarCV::getNonzerosToZerosRatio (const cv::Mat & monochromeImg)
 {
     assert(monochromeImg.type() == CV_8UC1);
@@ -220,31 +259,67 @@ double TheCarCV::getNonzerosToZerosRatio (const cv::Mat & monochromeImg)
     return (double) countOfNonZero / (double) countOfZero;
 }
 
-void TheCarCV::processFrame (Mat frame)
+void TheCarCV::saveAnImage (const Mat1b & preparedImage)
 {
+    assert(preparedImage.rows != 0 || preparedImage.cols != 0);
+
+    Mat1b toSave;
+    preparedImage.copyTo(toSave);
+
+    for (uchar & p : Mat1b(toSave))
+    {
+        p = p ? (uchar) 255 : (uchar) 0;
+    }
+
+    // the baseDirectory with will be used to save test images
+    static string outputDirectory = getString("files/output_directory");
+    // prepare OS
+    // experimental::filesystem is used here
+    static bool checked = false;
+    if (!checked)
+    {
+        if (!exists(path(outputDirectory)))
+        {
+            create_directory(path(outputDirectory));
+        }
+        checked = true;
+    }
+    static int a = 0;
+
+    string filepath = outputDirectory + "/" + to_string(++a) + ".png";
+    LOGI << "saving " + filepath;
+    imwrite(filepath, toSave);
+}
+
+void TheCarCV::uniteRedAndBlue (const Mat1b & red, const Mat1b & blue, Mat3b & dst)
+{
+    assert(red.rows != 0 && red.cols != 0 && blue.rows != 0 && blue.cols != 0);
+    assert(red.rows == blue.rows && red.cols == blue.cols);
+
+    Mat redAndBlueOnly(red.size(), CV_8UC3);
+    int red_from_to[] = {0, 2};
+    mixChannels(red, redAndBlueOnly, red_from_to, 1);
+    int blue_from_to[] = {0, 0, -1, 1};
+    mixChannels(blue, redAndBlueOnly, blue_from_to, 2);
+
+    dst = redAndBlueOnly;
+}
+
+bool TheCarCV::processFrame (const Mat3b & frame)
+{
+    Mat3b reinforcedBlue;
+    reinforceBlueUsingRed(frame, reinforcedBlue);
+
     Mat gray;
-    cvtColor(frame, gray, CV_BGR2GRAY);
+    cvtColor(reinforcedBlue, gray, CV_BGR2GRAY);
 
     Mat imgHSV;
 
-    // takes ~0.006 sec.
-    cvtColor(frame, imgHSV, COLOR_BGR2HSV);
+    cvtColor(reinforcedBlue, imgHSV, COLOR_BGR2HSV);
 
-    Mat red, blue;
-
-    // takes ~0.0016 sec.
-    hsvFilter(imgHSV, red, redILowH, redIHighH, redILowS, redIHighS, redILowV, redIHighV);
+    Mat blue;
     hsvFilter(imgHSV, blue, blueILowH, blueIHighH, blueILowS, blueIHighS, blueILowV, blueIHighV);
-
-    {
-        Mat redAndBlueOnly(red.size(), CV_8UC3);
-        int red_from_to[] = {0, 2};
-        mixChannels(red, redAndBlueOnly, red_from_to, 1);
-        int blue_from_to[] = {0, 0, -1, 1};
-        mixChannels(blue, redAndBlueOnly, blue_from_to, 2);
-
-        imshow("red and blue only", redAndBlueOnly);
-    }
+    if (show && showExtra) imshow("blue", blue);
 
     vector<Vec3f> circles;
     openCVHughCircleTransform(gray, circles);
@@ -254,30 +329,59 @@ void TheCarCV::processFrame (Mat frame)
         const int minRadius = getInt("hough_circle_transform_parametrs/min_radius");
         if (c[2] < minRadius) continue; // it's double verify for minRadius limit
 
-        Mat redResult, blueResult;
+        Mat cut;
 
-        if (!cutSquareRegionByCircle(red, redResult, c[0], c[1], c[2])) continue;
-        if (!cutSquareRegionByCircle(blue, blueResult, c[0], c[1], c[2])) continue;
+        if (!cutSquareRegionByCircle(blue, cut, c[0], c[1], c[2])) continue;
 
-        double nonzerosToZerosRatioOfRed = getNonzerosToZerosRatio(redResult);
-        double nonzerosToZerosRatioOfBlue = getNonzerosToZerosRatio(blueResult);
+        double rationofNonzerosToZeros = getNonzerosToZerosRatio(cut);
 
         static double minRatio = getDouble("detection/ratio_nonzeros_to_zeros");
         // if in both images too small non zero pixels then there is no good shot, is isn't red or blue sign
-        if (max(nonzerosToZerosRatioOfRed, nonzerosToZerosRatioOfBlue) < minRatio) continue;
+        if (rationofNonzerosToZeros < minRatio) continue;
 
-        if (nonzerosToZerosRatioOfBlue > nonzerosToZerosRatioOfRed) // then it's blue sign
+        int sign = RoadSign::NONE;
+
+        if (mode != VIDEO)
         {
-            Detect::getInstance().detect(blueResult, RoadSign::Color::BLUE);
-            // then draw to main window what we found
-            circle(frame, Point(cvRound(c[0]), cvRound(c[1])), cvRound(c[2]), Scalar(200, 50, 30), 3); // ~blue color
-        } else
-        { // red
-            Detect::getInstance().detect(redResult, RoadSign::Color::RED);
-            // then draw to main window what we found
-            circle(frame, Point(cvRound(c[0]), cvRound(c[1])), cvRound(c[2]), Scalar(60, 20, 230), 3); // ~red color
+            Mat1b preparedImage;
+            Detect::getInstance().prepareAnImage(cut, preparedImage);
+
+            if (mode == COLLECT)
+            {
+                saveAnImage(preparedImage);
+            } else if (mode == DETECTION)
+            {
+                sign = Detect::getInstance().detect(preparedImage);
+                LOGI << "Detected: " + RoadSign::getName(sign);
+            }
+        }
+
+        // Mark the circle was found if it contain minimal necessary value
+        // of blue or red color inside so that to be passed to detection
+        circle(
+                reinforcedBlue,
+                Point(cvRound(c[0]), cvRound(c[1])),
+                cvRound(c[2]),
+                Scalar(50, 200, 30),  // ~green color
+                3
+        );
+
+
+        if (mode == DETECTION)
+        {
+            putText(reinforcedBlue,
+                    "Found: " + RoadSign::getName(sign),
+                    Point(5, 20), // coordinates
+                    FONT_HERSHEY_COMPLEX_SMALL, // font
+                    1.0, // scale
+                    Scalar(0, 0, 200),
+                    1, // thickness
+                    CV_AA
+            ); // BGR color
         }
     }
 
-    IFWIN imshow("original", frame);
+    if (show) imshow("original", reinforcedBlue);
+
+    return false;
 }
