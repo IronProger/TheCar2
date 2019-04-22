@@ -1,7 +1,7 @@
 # TheCarCV
 This project was created to take part in competition of robots.
 It can be trained to detect road signs and it can detect them.
-It contains a bit of machine learning and works very fast. 
+It contains a bit of machine learning and works as fast as it is possible with hough circle transform of OpenCV. 
 
 ## Compiling and initial setup
 
